@@ -3,52 +3,62 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
-from sklearn.model_selection import train_test_split, cross_val_score
+from sklearn.model_selection import train_test_split, cross_val_score, GridSearchCV
 from sklearn.preprocessing import StandardScaler, LabelEncoder
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_squared_error
-from sklearn.model_selection import GridSearchCV
 
 # Set style for plots
 sns.set_style("whitegrid")
 
 # Load data
-train = pd.read_csv('/path/to/train.csv')
-test = pd.read_csv('/path/to/test.csv')
-submission = pd.read_csv('/path/to/sample_submission.csv')
+train = pd.read_csv('/content/train.csv')
+test = pd.read_csv('/content/test.csv')
+submission = pd.read_csv('/content/sample_submission.csv')
 
-# Check for missing data
+# Check for missing data in training set
 missing_train = train.isnull().sum()
 missing_train = missing_train[missing_train > 0].sort_values(ascending=False)
 print(f"Missing values in training set:\n{missing_train}")
 
-# Fill missing values for numerical and categorical data
+# Fill missing values for numerical columns
 for col in train.select_dtypes(include=['number']).columns:
-    train[col].fillna(train[col].median(), inplace=True)
-    test[col].fillna(test[col].median(), inplace=True)
+    if col in train.columns:
+        train[col].fillna(train[col].median(), inplace=True)
+    if col in test.columns:
+        test[col].fillna(test[col].median(), inplace=True)
 
+# Fill missing values for categorical columns
 for col in train.select_dtypes(include=['object']).columns:
-    train[col].fillna(train[col].mode()[0], inplace=True)
-    test[col].fillna(test[col].mode()[0], inplace=True)
+    if col in train.columns:
+        train[col].fillna(train[col].mode()[0], inplace=True)
+    if col in test.columns:
+        test[col].fillna(test[col].mode()[0], inplace=True)
 
 # Log transform the target variable to reduce skewness
-train['SalePrice'] = np.log1p(train['SalePrice'])
+if 'SalePrice' in train.columns:
+    train['SalePrice'] = np.log1p(train['SalePrice'])
 
 # Visualize target variable
 sns.histplot(train['SalePrice'], kde=True)
 plt.title("Log-transformed SalePrice Distribution")
 plt.show()
 
+# Save and separate target variable
+if 'SalePrice' in train.columns:
+    y = train['SalePrice']
+    train = train.drop(['SalePrice'], axis=1)
+else:
+    raise KeyError("SalePrice column is missing from the training dataset.")
+
 # Concatenate train and test data for easier feature engineering
-y = train['SalePrice']
-train.drop(['SalePrice'], axis=1, inplace=True)
 combined_data = pd.concat([train, test], keys=['train', 'test'])
 
 # Encoding categorical variables
 combined_data = pd.get_dummies(combined_data, drop_first=True)
 
-# Split combined data back into train and test
+# Split combined data back into train and test sets
 train = combined_data.xs('train')
 test = combined_data.xs('test')
 
